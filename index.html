@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+<title>さんすうモンスター</title>
+
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<meta name="theme-color" content="#ffcf33">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="さんすうモンスター">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+<style>
+body{
+  margin:0;
+  font-family:"Hiragino Sans","Yu Gothic",sans-serif;
+  background:linear-gradient(#b9ecff,#fff7c2);
+  text-align:center;
+  color:#333;
+  touch-action:manipulation;
+  user-select:none;
+}
+.app{
+  max-width:520px;
+  margin:auto;
+  padding:18px;
+}
+h1{
+  font-size:34px;
+  color:#ff6b00;
+  text-shadow:2px 2px #fff;
+}
+.boxes{
+  display:flex;
+  gap:8px;
+  margin:12px 0;
+}
+.box{
+  flex:1;
+  background:#fff;
+  border-radius:18px;
+  padding:10px;
+  font-weight:bold;
+  box-shadow:0 4px 0 #ddd;
+}
+.monster{
+  font-size:92px;
+  margin:10px 0;
+  transition:.2s;
+}
+.hit{
+  transform:scale(1.25) rotate(8deg);
+}
+.hp-bg{
+  height:24px;
+  background:#eee;
+  border-radius:20px;
+  overflow:hidden;
+}
+.hp{
+  height:100%;
+  width:100%;
+  background:linear-gradient(90deg,#73d13d,#ffcc00);
+  transition:.25s;
+}
+.card{
+  background:#fff;
+  border-radius:24px;
+  padding:18px;
+  margin:12px 0;
+  box-shadow:0 5px 0 #ddd;
+}
+.question{
+  font-size:42px;
+  font-weight:bold;
+}
+.choices{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+  margin-top:16px;
+}
+button{
+  font-size:28px;
+  font-weight:bold;
+  border:none;
+  border-radius:22px;
+  padding:20px 8px;
+  background:#fff;
+  box-shadow:0 6px 0 #c9c9c9;
+  cursor:pointer;
+}
+button:active{
+  transform:translateY(4px);
+  box-shadow:0 2px 0 #c9c9c9;
+}
+.mainbtn{
+  background:#ffcf33;
+  width:100%;
+  margin-top:14px;
+}
+.message{
+  min-height:38px;
+  font-size:24px;
+  font-weight:bold;
+  color:#ff4d4f;
+  margin-top:12px;
+}
+.stickers{
+  font-size:30px;
+  min-height:42px;
+  background:#fff;
+  border-radius:18px;
+  padding:8px;
+  margin-top:10px;
+}
+.hidden{
+  display:none;
+}
+.small{
+  font-size:15px;
+  color:#555;
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <div id="titleScreen">
+    <h1>さんすうモンスター</h1>
+    <div style="font-size:100px;">👾</div>
+    <div class="card">
+      たしざん・ひきざんで<br>
+      モンスターをやっつけよう！
+    </div>
+    <button class="mainbtn" onclick="startGame()">スタート</button>
+    <p class="small">正解すると音が鳴ります</p>
+  </div>
+
+  <div id="gameScreen" class="hidden">
+    <h1>さんすうモンスター</h1>
+
+    <div class="boxes">
+      <div class="box">レベル<br><span id="level">1</span></div>
+      <div class="box">てんすう<br><span id="score">0</span></div>
+      <div class="box">れんぞく<br><span id="combo">0</span></div>
+    </div>
+
+    <div id="monster" class="monster">👾</div>
+
+    <div class="card">
+      <div>モンスターのげんき</div>
+      <div class="hp-bg">
+        <div id="hp" class="hp"></div>
+      </div>
+    </div>
+
+    <div class="card question" id="question">?</div>
+
+    <div class="choices">
+      <button onclick="checkAnswer(this)">?</button>
+      <button onclick="checkAnswer(this)">?</button>
+      <button onclick="checkAnswer(this)">?</button>
+      <button onclick="checkAnswer(this)">?</button>
+    </div>
+
+    <div id="message" class="message"></div>
+
+    <div class="stickers">
+      ごほうび：<span id="stickers"></span>
+    </div>
+
+    <button class="mainbtn" onclick="startGame()">もういちど</button>
+  </div>
+
+</div>
+
+<script>
+let answer = 0;
+let score = 0;
+let combo = 0;
+let level = 1;
+let hp = 100;
+let playing = false;
+let stickerCount = 0;
+
+const monsters = ["👾","👻","🐲","🦖","😈","🤖"];
+const stickerList = ["⭐","🌈","🍀","🏅","💎","🎁","🌟","👑"];
+
+function sound(type){
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AudioContextClass();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  if(type === "ok"){
+    osc.frequency.value = 660;
+    gain.gain.value = 0.12;
+  }else{
+    osc.frequency.value = 180;
+    gain.gain.value = 0.08;
+  }
+
+  osc.start();
+  osc.stop(ctx.currentTime + 0.15);
+}
+
+function startGame(){
+  document.getElementById("titleScreen").classList.add("hidden");
+  document.getElementById("gameScreen").classList.remove("hidden");
+
+  score = 0;
+  combo = 0;
+  level = 1;
+  hp = 100;
+  stickerCount = 0;
+  playing = true;
+
+  document.getElementById("monster").textContent = monsters[0];
+  document.getElementById("stickers").textContent = "";
+  document.getElementById("message").textContent = "がんばって！";
+
+  updateStatus();
+  makeQuestion();
+}
+
+function makeQuestion(){
+  let max = 10 + level * 5;
+  let a = Math.floor(Math.random() * max) + 1;
+  let b = Math.floor(Math.random() * max) + 1;
+  let type = Math.random() < 0.55 ? "+" : "-";
+
+  if(type === "-"){
+    if(b > a){
+      let t = a;
+      a = b;
+      b = t;
+    }
+    answer = a - b;
+  }else{
+    answer = a + b;
+  }
+
+  document.getElementById("question").textContent = `${a} ${type} ${b} = ?`;
+
+  let choices = [answer];
+
+  while(choices.length < 4){
+    let wrong = answer + Math.floor(Math.random() * 11) - 5;
+    if(wrong < 0) wrong = Math.abs(wrong);
+    if(!choices.includes(wrong)){
+      choices.push(wrong);
+    }
+  }
+
+  choices.sort(() => Math.random() - 0.5);
+
+  document.querySelectorAll(".choices button").forEach((btn, i) => {
+    btn.textContent = choices[i];
+  });
+}
+
+function checkAnswer(button){
+  if(!playing) return;
+
+  const selected = Number(button.textContent);
+  const monster = document.getElementById("monster");
+
+  if(selected === answer){
+    sound("ok");
+
+    score += 10;
+    combo++;
+    hp -= 20;
+
+    monster.classList.add("hit");
+    document.getElementById("message").textContent = "せいかい！こうげき！";
+
+    setTimeout(() => {
+      monster.classList.remove("hit");
+    }, 200);
+
+    if(combo % 3 === 0){
+      score += 10;
+      addSticker();
+      document.getElementById("message").textContent = "3れんぞく！ごほうびシール！";
+    }
+
+    if(hp <= 0){
+      level++;
+      hp = 100;
+      addSticker();
+      document.getElementById("monster").textContent = monsters[(level - 1) % monsters.length];
+      document.getElementById("message").textContent = "やった！つぎのモンスター！";
+    }
+
+    updateStatus();
+    setTimeout(makeQuestion, 500);
+
+  }else{
+    sound("ng");
+    combo = 0;
+    document.getElementById("message").textContent = "おしい！もういちど！";
+    updateStatus();
+  }
+}
+
+function addSticker(){
+  stickerCount++;
+  const s = stickerList[(stickerCount - 1) % stickerList.length];
+  document.getElementById("stickers").textContent += s;
+}
+
+function updateStatus(){
+  document.getElementById("score").textContent = score;
+  document.getElementById("combo").textContent = combo;
+  document.getElementById("level").textContent = level;
+  document.getElementById("hp").style.width = hp + "%";
+}
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js");
+  });
+}
+</script>
+
+</body>
+</html>
